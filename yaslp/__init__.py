@@ -1,5 +1,5 @@
 from collections import namedtuple
-from functools import partial
+from functools import cached_property, partial
 from typing import Iterable
 
 import jax.numpy as np
@@ -86,12 +86,31 @@ def _embed_sphere(
     return np.sum(basis_normalized**2, axis=-1) < 1
 
 
+class EllipsoidPhantom:
+    def __init__(self, grid_shape: tuple, ellipses: list[Ellipse] = ELLIPSES):
+        """Build an integer-valued phantom from a collection of ellipsoids
+
+        (currently limited to 3D)"""
+        assert (
+            len(grid_shape) == 3
+        ), "rotation_matrix in its present form expects a 3D space"
+        self.grid = grid_basis(grid_shape)
+        self.ellipses = ellipses
+        self.masks = [
+            _embed_sphere(self.grid, e.center, e.radius, e.phi) for e in ellipses
+        ]
+        self.n = len(ellipses)
+
+    @cached_property
+    def label_map(self):
+        # why not just mask * e.value?
+        return sum(
+            [np.where(mask, e.value, 0) for mask, e in zip(self.masks, self.ellipses)]
+        )
+
+    def __repr__(self):
+        return f"{self.__class__.__name__} with {self.n} ellipses"
+
+
 def shepp_logan(grid_shape: tuple, ellipses: list[Ellipse] = ELLIPSES) -> np.ndarray:
-    grid = grid_basis(grid_shape)
-    phantom = sum(
-        [
-            np.where(_embed_sphere(grid, e.center, e.radius, e.phi), e.value, 0)
-            for e in ellipses
-        ],
-    )
-    return phantom
+    return EllipsoidPhantom(grid_shape, ellipses).label_map
