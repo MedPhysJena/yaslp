@@ -2,24 +2,9 @@ from collections import namedtuple
 from functools import cached_property, partial
 from typing import Iterable
 
-import jax.numpy as np
+import jax.numpy as jnp
 
-
-def grid_basis(
-    grid_shape: Iterable[int], reciprocal=False, normalise=False
-) -> np.ndarray:
-    if reciprocal:
-        basis_vecs = [np.fft.fftfreq(size) for size in grid_shape]
-    else:
-        basis_vecs = [np.linspace(-1, 1, size) for size in grid_shape]
-
-    grid = np.stack(np.meshgrid(*basis_vecs, indexing="ij"), axis=-1)
-
-    if normalise:
-        norm = np.linalg.norm(grid, axis=-1)
-        grid /= np.where(norm == 0, np.inf, norm)[..., None]
-    return grid
-
+from yaslp.utils import grid_basis
 
 Ellipse = namedtuple("Ellipse", ["value", "radius", "center", "phi"])
 ELLIPSES = [
@@ -33,14 +18,14 @@ ELLIPSES = [
 ]
 
 
-@partial(np.vectorize, signature="(n,n),(n)->(n)")
-def _rotate(rot: np.ndarray, vector: np.ndarray) -> np.ndarray:
+@partial(jnp.vectorize, signature="(n,n),(n)->(n)")
+def _rotate(rot: jnp.ndarray, vector: jnp.ndarray) -> jnp.ndarray:
     return rot.dot(vector)
 
 
 def _embed_sphere(
-    basis: np.ndarray, center: Iterable, radius: Iterable | float, phi: float
-) -> np.ndarray:
+    basis: jnp.ndarray, center: Iterable, radius: Iterable | float, phi: float
+) -> jnp.ndarray:
     """
     Create a boolean array with an ellipsoid within the grid specified by the basis
 
@@ -78,12 +63,12 @@ def _embed_sphere(
            [0, 0, 0, 0, 0, 0, 0, 0],
            [0, 0, 0, 0, 0, 0, 0, 0]])
     """
-    rotation_matrix = np.array(
-        [[np.cos(phi), np.sin(phi), 0], [-np.sin(phi), np.cos(phi), 0], [0, 0, 1]]
+    rotation_matrix = jnp.array(
+        [[jnp.cos(phi), jnp.sin(phi), 0], [-jnp.sin(phi), jnp.cos(phi), 0], [0, 0, 1]]
     )
-    basis_rotated = _rotate(rotation_matrix, basis - np.asarray(center))
-    basis_normalized = basis_rotated / np.asarray(radius)
-    return np.sum(basis_normalized**2, axis=-1) < 1
+    basis_rotated = _rotate(rotation_matrix, basis - jnp.asarray(center))
+    basis_normalized = basis_rotated / jnp.asarray(radius)
+    return jnp.sum(basis_normalized**2, axis=-1) < 1
 
 
 class EllipsoidPhantom:
@@ -105,12 +90,12 @@ class EllipsoidPhantom:
     def label_map(self):
         # why not just mask * e.value?
         return sum(
-            [np.where(mask, e.value, 0) for mask, e in zip(self.masks, self.ellipses)]
+            [jnp.where(mask, e.value, 0) for mask, e in zip(self.masks, self.ellipses)]
         )
 
     def __repr__(self):
         return f"{self.__class__.__name__} with {self.n} ellipses"
 
 
-def shepp_logan(grid_shape: tuple, ellipses: list[Ellipse] = ELLIPSES) -> np.ndarray:
+def shepp_logan(grid_shape: tuple, ellipses: list[Ellipse] = ELLIPSES) -> jnp.ndarray:
     return EllipsoidPhantom(grid_shape, ellipses).label_map
