@@ -2,9 +2,9 @@ from collections import namedtuple
 from functools import cached_property, partial
 from typing import Iterable
 
-import jax.numpy as jnp
-
-from yaslp.utils import grid_basis
+from jax import numpy as jnp
+from jax import random
+from yaslp.utils import grid_basis, perturb_vector_field, safe_normalize
 
 Ellipse = namedtuple("Ellipse", ["value", "radius", "center", "phi"])
 ELLIPSES = [
@@ -95,6 +95,38 @@ class EllipsoidPhantom:
 
     def __repr__(self):
         return f"{self.__class__.__name__} with {self.n} ellipses"
+
+    def disperse_vector_field(
+        self, lut: jnp.ndarray, dispersion_factor=3.0, rng=None, concentration=1.0
+    ):
+        # FIX: pretty much the entire function below operates under presumption that
+        # there is a single ellipsoid, overlapping with each FG ROI. Additionally,
+        # the treatment of BG may not be general (and is certainly neither clear
+        # nor uniform)
+
+        # lut includes BG as 0th
+        directional_labels = jnp.argwhere(
+            jnp.linalg.norm(lut[1:], axis=-1) > 0
+        ).flatten()
+        vectors = lut[self.label_map]
+        fg_roi_val2center = {
+            self.ellipses[idx].value + 1: self.ellipses[idx].center
+            for idx in directional_labels
+        }
+        vectors += dispersion_factor * perturb_vector_field(
+            vectors,
+            self.label_map,
+            label_pivot_centres=fg_roi_val2center,
+            label_primary_axis=jnp.argmax(lut, axis=1),
+        )
+        vectors_norm = jnp.linalg.norm(vectors, axis=-1)[..., None]
+        vectors = jnp.nan_to_num(vectors / vectors_norm, posinf=0, neginf=0)
+        if rng is not None:
+            eps = random.normal(rng, shape=vectors.shape)
+            vectors = safe_normalize(
+                (vectors * concentration) + jnp.where(vectors_norm > 0, eps, 0)
+            )
+        return vectors
 
 
 def shepp_logan(grid_shape: tuple, ellipses: list[Ellipse] = ELLIPSES) -> jnp.ndarray:

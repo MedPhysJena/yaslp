@@ -53,3 +53,27 @@ def perturb_vector_field(
         pertubration += jnp.where(phantom[..., None] == phantom_value, perturb, 0)
 
     return pertubration
+
+
+def safe_normalize(x, *, p=2):
+    """
+    Safely project a vector onto the sphere wrt the ``p``-norm. This avoids the
+    singularity at zero by mapping zero to the uniform unit vector proportional
+    to ``[1, 1, ..., 1]``.
+
+    :param numpy.ndarray x: A vector
+    :param float p: The norm exponent, defaults to 2 i.e. the Euclidean norm.
+    :returns: A normalized version ``x / ||x||_p``.
+    :rtype: numpy.ndarray
+
+    Copied verbatim from numpyro.distributions.util (Apache 2.0)
+    """
+    # TODO: refactor to suit my needs
+    assert isinstance(p, (float, int))
+    assert p >= 0
+    norm = jnp.linalg.norm(x, p, axis=-1, keepdims=True)
+    x = x / jnp.clip(norm, a_min=jnp.finfo(x).tiny)
+    # Avoid the singularity.
+    mask = jnp.all(x == 0, axis=-1, keepdims=True)
+    x = jnp.where(mask, x.shape[-1] ** (-1 / p), x)
+    return x
