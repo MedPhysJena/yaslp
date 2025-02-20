@@ -1,17 +1,19 @@
-from typing import Iterable
-
 import jax.numpy as jnp
+from jaxtyping import Array, Float
 
 
 def grid_basis(
-    grid_shape: Iterable[int], reciprocal=False, normalise=False
-) -> jnp.ndarray:
+    grid_shape: tuple[int, ...],
+    reciprocal=False,
+    normalise=False,
+    stacking_axis=-1,
+) -> Float[Array, "*batch ndim"]:
     if reciprocal:
         basis_vecs = [jnp.fft.fftfreq(size) for size in grid_shape]
     else:
         basis_vecs = [jnp.linspace(-1, 1, size) for size in grid_shape]
 
-    grid = jnp.stack(jnp.meshgrid(*basis_vecs, indexing="ij"), axis=-1)
+    grid = jnp.stack(jnp.meshgrid(*basis_vecs, indexing="ij"), axis=stacking_axis)
 
     if normalise:
         norm = jnp.linalg.norm(grid, axis=-1)

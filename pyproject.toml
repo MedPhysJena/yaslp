@@ -10,7 +10,7 @@ authors = [
 version = "0.1.2"
 license = { text = "MIT License" }
 description = "Yet Another Shepp-Logan Phantom, this time using jax.numpy"
-dependencies = ["jax"]
+dependencies = ["jax", "jaxtyping"]
 
 [tool.setuptools]
 packages = ["yaslp"]
