@@ -1,3 +1,5 @@
+import warnings
+
 import jax.numpy as jnp
 from jaxtyping import Array, Float
 
@@ -5,12 +7,17 @@ from jaxtyping import Array, Float
 def grid_basis(
     grid_shape: tuple[int, ...],
     reciprocal=False,
+    rfft=False,
     normalise=False,
     stacking_axis=-1,
 ) -> Float[Array, "*batch ndim"]:
     if reciprocal:
         basis_vecs = [jnp.fft.fftfreq(size) for size in grid_shape]
+        if rfft:
+            basis_vecs[-1] = jnp.fft.rfftfreq(grid_shape[-1])
     else:
+        if rfft:
+            warnings.warn("rfft=True is ignored if reciprocal=False")
         basis_vecs = [jnp.linspace(-1, 1, size) for size in grid_shape]
 
     grid = jnp.stack(jnp.meshgrid(*basis_vecs, indexing="ij"), axis=stacking_axis)
