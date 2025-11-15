@@ -1,4 +1,5 @@
 import warnings
+from typing import Literal
 
 import jax.numpy as jnp
 from jaxtyping import Array, Float
@@ -6,23 +7,38 @@ from jaxtyping import Array, Float
 
 def grid_basis(
     grid_shape: tuple[int, ...],
-    reciprocal=False,
     rfft=False,
-    normalise=False,
+    return_unit_vector=False,
     stacking_axis=-1,
+    domain: Literal["-1:1", "int"] = "-1:1",
+    reciprocal: bool = False,
+    normalise: bool | None = None,
 ) -> Float[Array, "*batch ndim"]:
+    if normalise is not None:
+        warnings.warn(
+            "'normalise' is depricated, set return_unit_vector=True", DeprecationWarning
+        )
+        return_unit_vector = normalise
+
     if reciprocal:
         basis_vecs = [jnp.fft.fftfreq(size) for size in grid_shape]
         if rfft:
             basis_vecs[-1] = jnp.fft.rfftfreq(grid_shape[-1])
+        if domain == "int":
+            basis_vecs = [vec / vec[1] for vec in basis_vecs]
     else:
         if rfft:
             warnings.warn("rfft=True is ignored if reciprocal=False")
-        basis_vecs = [jnp.linspace(-1, 1, size) for size in grid_shape]
+        if domain == "-1:1":
+            basis_vecs = [jnp.linspace(-1, 1, size) for size in grid_shape]
+        elif domain == "int":
+            basis_vecs = [jnp.arange(size) - size // 2 for size in grid_shape]
+        else:
+            raise ValueError(f"domain must be 'int' or '-1:1', got {domain}")
 
     grid = jnp.stack(jnp.meshgrid(*basis_vecs, indexing="ij"), axis=stacking_axis)
 
-    if normalise:
+    if return_unit_vector:
         norm = jnp.linalg.norm(grid, axis=-1)
         grid /= jnp.where(norm == 0, jnp.inf, norm)[..., None]
     return grid
