@@ -7,7 +7,7 @@ name = "yaslp"
 authors = [
     {name = "Renat Sibgatulin", email = "sibgatulin@tuta.io"}
 ]
-version = "0.3.0"
+version = "0.4.0"
 license = { text = "MIT License" }
 description = "Yet Another Shepp-Logan Phantom, this time using jax.numpy"
 dependencies = ["jax", "jaxtyping"]
